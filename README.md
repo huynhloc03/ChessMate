@@ -23,3 +23,12 @@ A Python-based Chess game with integrated Stockfish AI. Players can play against
 Install the required libraries by running:
 ```bash
 pip install pillow python-chess stockfish
+```
+
+## How to Run
+### Clone the repository:
+```
+git clone https://github.com/yourusername/ChessMates.git
+cd ChessMates
+```
+
