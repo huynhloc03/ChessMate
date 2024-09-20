@@ -51,9 +51,9 @@ python main.py
 At the start of the game, you will be prompted to choose your color (White or Black).
 
 ## Gameplay:
--**Click on your pieces to highlight legal moves.**
--**After selecting your move, the AI will respond with its move.**
--**The game continues until checkmate, stalemate, or resignation.**
+- Click on your pieces to highlight legal moves.
+- After selecting your move, the AI will respond with its move.
+- The game continues until checkmate, stalemate, or resignation.
 
 ## Feedback:
 After the game ends, a feedback dialog will display each move's analysis, showing if it was a "Good move," "Okay move," "Mistake," or "Blunder."
