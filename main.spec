@@ -5,7 +5,7 @@ a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[],
-    datas=[('D:/ChessMates/image', 'image'), ('D:/ChessMates/stockfish/stockfish-windows-x86-64-avx2.exe', 'stockfish')],
+    datas=[('image', 'image'), ('stockfish/stockfish-windows-x86-64-avx2.exe', 'stockfish')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

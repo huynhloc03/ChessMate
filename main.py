@@ -3,14 +3,21 @@ from PIL import Image, ImageDraw, ImageFont, ImageTk
 import chess
 from stockfish import Stockfish
 import os
+import sys
 import tkinter.messagebox as messagebox
 import tkinter.simpledialog as simpledialog
 from tkinter import PhotoImage, Label
 
-
+def resource_path(relative_path):
+    try:
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
 
 # Set the path to your chess piece images folder
-IMAGE_PATH = "D:/ChessMates/image"  # Ensure the path uses forward slashes
+# IMAGE_PATH = "D:/ChessMates/image"  # Ensure the path uses forward slashes
+IMAGE_PATH = resource_path("image")  # Now points to the image folder inside the bundled executable
 
 # Load piece images into a dictionary
 pieces_names = ['white-rook', 'white-knight', 'white-bishop', 'white-queen', 'white-king', 'white-pawn',
@@ -19,7 +26,9 @@ pieces_names = ['white-rook', 'white-knight', 'white-bishop', 'white-queen', 'wh
 pieces_images = {name: Image.open(os.path.join(IMAGE_PATH, f"{name}.png")).resize((125, 125)) for name in pieces_names}
 
 # Initialize Stockfish AI
-stockfish = Stockfish("D:/ChessMates/stockfish/stockfish-windows-x86-64-avx2.exe")  # Ensure path uses forward slashes
+# stockfish = Stockfish("D:/ChessMates/stockfish/stockfish-windows-x86-64-avx2.exe")  # Ensure path uses forward slashes
+stockfish = Stockfish(resource_path("stockfish/stockfish-windows-x86-64-avx2.exe"))  # Now points to Stockfish inside the executable
+
 stockfish.set_skill_level(3)  # Set the AI's starting skill level
 
 # Global variable to track if player is white
@@ -29,6 +38,7 @@ player_is_white = True
 # board = chess.Board("8/7P/8/8/8/8/8/8 w - - 0 1")  # Initialize the board to the starting position
 # board = chess.Board(fen="8/7P/8/8/8/8/8/7k w - - 0 1") 
 # board = chess.Board(fen="8/7P/8/4k3/7p/5K2/8/8 w - - 0 1")
+
 board = chess.Board()
 # Function to adjust AI rank based on difficulty changes
 def get_title_by_difficulty_changes(skill_level):
@@ -252,21 +262,25 @@ def get_piece_image(piece):
 
 # Function to render the chessboard using Pillow and include pieces, labels, and valid move dots
 def render_board():
+    # Get screen dimensions to scale dynamically
+    canvas_width = canvas.winfo_width()
+    canvas_height = canvas.winfo_height()
+
+    # Calculate square size based on a fraction of the screen height
+    square_size = min(canvas_width, canvas_height) // 8
+
     # Create an empty image for the chessboard (with labels inside squares)
-    img = Image.new('RGB', (1000, 1000), 'white')
+    img = Image.new('RGB', (square_size * 8, square_size * 8), 'white')
     draw = ImageDraw.Draw(img)
 
-    # Chessboard square size
-    square_size = 125
     colors = ['#D18B47', '#FFCE9E']  # Dark and light square colors
     dot_color = "#FF0000"  # Red dots for valid moves
     capture_color = "#FFA07A"  # Light red color for capturing pieces
     check_highlight_color = "#FF7F7F"  # Light red color for check or checkmate highlight
     
     # Define your custom font and size
-    font_path = "arial.ttf"  # Path to your .ttf font file (you can choose any font)
-    font_size = 15  # Adjust the size as needed
-    font = ImageFont.truetype(font_path, font_size)
+    font_size = square_size // 8  # Scale the font size based on square size
+    font = ImageFont.truetype("arial.ttf", font_size)
 
     # Determine if the board is in check or checkmate
     in_checkmate = board.is_checkmate()
@@ -305,7 +319,7 @@ def render_board():
             # Highlight valid moves and capture squares correctly
             if chess.square(real_file, real_rank) in highlighted_moves:
                 dot_x, dot_y = (x0 + x1) // 2, (y0 + y1) // 2
-                draw.ellipse((dot_x - 5, dot_y - 5, dot_x + 5, dot_y + 5), fill=dot_color)
+                draw.ellipse((dot_x - square_size // 10, dot_y - square_size // 10, dot_x + square_size // 10, dot_y + square_size // 10), fill=dot_color)
 
             if chess.square(real_file, real_rank) in capturable_squares:
                 draw.rectangle([x0, y0, x1, y1], fill=capture_color)
@@ -314,7 +328,8 @@ def render_board():
             piece = board.piece_at(chess.square(real_file, real_rank))
             piece_image = get_piece_image(piece)
             if piece_image:
-                img.paste(piece_image, (x0, y0), piece_image)
+                piece_image_resized = piece_image.resize((square_size, square_size), Image.Resampling.LANCZOS)
+                img.paste(piece_image_resized, (x0, y0), piece_image_resized)
 
             # Draw labels for ranks (left side) and files (bottom side)
             if file == 0:
@@ -328,6 +343,7 @@ def render_board():
     # Display the chessboard on the canvas
     canvas.create_image(0, 0, anchor=tk.NW, image=img_tk)
     canvas.image = img_tk  # Keep a reference to avoid garbage collection
+
 
 
 def highlight_valid_moves(square):
@@ -446,8 +462,8 @@ def adjust_ranks():
             # Update AI title based on difficulty changes
             ai_title = get_title_by_difficulty_changes(ai_skill_level)
             ai_label.config(text=f"AI - {ai_title}")  # Update the AI title in the UI
-    # If the player is winning by 2 or more material points, increase AI difficulty
-    elif player_material >= ai_material + 2:
+    # If the player is winning by 4 or more material points, increase AI difficulty
+    elif player_material >= ai_material + 4:
         if ai_skill_level < 10:  # Cap the AI skill level at 10
             ai_skill_level += 1
             print(f"Player is winning. AI skill level increased to {ai_skill_level}")
@@ -729,25 +745,59 @@ def resign_game():
 def analyze_move(move_san, player):
     stockfish.set_fen_position(board.fen())  # Set FEN to current board state
 
-    # Get Stockfish's best move for comparison
+    # Get Stockfish's evaluation after the player's move
+    evaluation_after = stockfish.get_evaluation()
+
+    # Only evaluate centipawn differences (ignore "mate" evaluations for now)
+    if evaluation_after["type"] == "cp":  # "cp" stands for centipawns
+        eval_value_after_move = evaluation_after['value']  # Current evaluation in centipawns
+    else:
+        # If Stockfish returns a mate evaluation (e.g., mate in x moves), we consider it a good move
+        feedback = "Good move (Mate in sight)"
+        move_feedback.append((move_san, feedback, player))
+        return
+
+    # Get the best move evaluation from Stockfish (without pushing the move to the board)
+    stockfish.set_fen_position(board.fen())  # Reset the FEN to the current board state
     best_move = stockfish.get_best_move()
 
-    # Evaluate the position after the player's move
-    evaluation_after = stockfish.get_evaluation()  # Stockfish gives an evaluation after the move
-    
-    # Analyze and give feedback
-    eval_difference = evaluation_after['value']  # Get the evaluation value after the move
-    
-    # Determine if the player's move was a good move, mistake, or neutral
-    if eval_difference <= 10:
+    # Simulate the best move
+    stockfish.make_moves_from_current_position([best_move])
+    best_evaluation = stockfish.get_evaluation()
+
+    # Ensure we are comparing centipawn evaluations only
+    if best_evaluation["type"] == "cp":
+        eval_value_best_move = best_evaluation['value']  # Best evaluation in centipawns
+    else:
+        eval_value_best_move = eval_value_after_move  # If it's a mate evaluation, just use the current eval
+
+    # Calculate the difference between the player's move evaluation and the best move
+    eval_difference = eval_value_after_move - eval_value_best_move
+
+    # Refined thresholds for different categories of feedback
+    good_threshold = 30    # Up to 30 centipawn difference is a good move
+    okay_threshold = 100   # 31-100 centipawns is an okay move
+    mistake_threshold = 300  # 101-300 centipawns is a mistake
+    blunder_threshold = 500  # Over 300 centipawns is a blunder
+
+    # Analyze the move and categorize it
+    if abs(eval_difference) <= good_threshold:
         feedback = "Good move"
-    elif eval_difference > 50:
+    elif abs(eval_difference) <= okay_threshold:
+        feedback = "Okay move"
+    elif abs(eval_difference) <= mistake_threshold:
         feedback = "Mistake"
     else:
-        feedback = "Okay move"
-    
+        feedback = "Blunder"
+
+    # Debugging print for understanding eval difference
+    print(f"Move: {move_san}, Eval Difference: {eval_difference}, Feedback: {feedback}")
+
     # Add feedback to the global feedback list
     move_feedback.append((move_san, feedback, player))
+
+
+
 
 def show_feedback_dialog():
     # Create the feedback window
